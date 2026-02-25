@@ -7,22 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =====================================================
+// ========================
 // ENUMS
-// =====================================================
+// ========================
 enum BookingStatus {
   pending
   approved
   rejected
   cancelled
   completed
-}
-
-enum PaymentStatus {
-  pending
-  successful
-  failed
-  refunded
 }
 
 enum PropertyApprovalStatus {
@@ -36,37 +29,35 @@ enum MediaTypeEnum {
   video
 }
 
-// =====================================================
+// ========================
 // MODELS
-// =====================================================
+// ========================
+
 model User {
-  id              String    @id @default(uuid())
-  fullName        String
-  email           String    @unique
-  username        String    @unique
-  phone           String?
-  passwordHash    String
+  id           String    @id @default(uuid())
+  fullName     String
+  email        String    @unique
+  username     String    @unique
+  phone        String?
+  passwordHash String
   profileImageUrl String?
-  isVerified      Boolean   @default(false)
-  provider        String?   // "local" or "google"
-  providerId      String?   // Google OAuth ID
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  isVerified   Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
-  roles            UserRole[]
-  properties       Property[]
-  bookings         Booking[]
-  reviews          Review[]
-  favorites        Favorite[]
-  messagesSent     Message[]         @relation("MessagesSent")
+  roles       UserRole[]
+  properties  Property[]
+  bookings    Booking[]
+  reviews     Review[]
+  favorites   Favorite[]
+  messagesSent Message[]         @relation("MessagesSent")
   chatParticipants ChatParticipant[]
-  payments         Payment[]
-  notifications    Notification[]
-  adminActions     AdminAction[]     @relation("AdminActions")
-  chatbotLogs      ChatbotLog[]
-}
+  notifications Notification[]
+  adminActions   AdminAction[]   @relation("AdminActions")
 
+  @@map("users")
+}
 
 model Role {
   id        String   @id @default(uuid())
@@ -74,6 +65,8 @@ model Role {
   createdAt DateTime @default(now())
 
   users UserRole[]
+
+  @@map("roles")
 }
 
 model UserRole {
@@ -83,6 +76,7 @@ model UserRole {
   roleId String
 
   @@id([userId, roleId])
+  @@map("user_roles")
 }
 
 model Property {
@@ -106,12 +100,16 @@ model Property {
   bookings  Booking[]
   favorites Favorite[]
   reviews   Review[]
+
+  @@map("properties")
 }
 
 model Amenity {
   id         String            @id @default(uuid())
   name       String            @unique
   properties PropertyAmenity[]
+
+  @@map("amenities")
 }
 
 model PropertyAmenity {
@@ -121,6 +119,7 @@ model PropertyAmenity {
   amenityId  String
 
   @@id([propertyId, amenityId])
+  @@map("property_amenities")
 }
 
 model PropertyMedia {
@@ -130,6 +129,8 @@ model PropertyMedia {
   mediaUrl   String
   mediaType  MediaTypeEnum
   createdAt  DateTime      @default(now())
+
+  @@map("property_media")
 }
 
 model Favorite {
@@ -140,6 +141,7 @@ model Favorite {
   createdAt  DateTime @default(now())
 
   @@id([userId, propertyId])
+  @@map("favorites")
 }
 
 model Booking {
@@ -154,30 +156,8 @@ model Booking {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   deletedAt  DateTime?
-  payments   Payment[]
-}
 
-model Payment {
-  id String @id @default(uuid())
-
-  // 🔗 Relation to Booking
-  booking   Booking @relation(fields: [bookingId], references: [id])
-  bookingId String
-
-  // 🔗 Relation to User (who made the payment)
-  user   User   @relation(fields: [userId], references: [id])
-  userId String
-
-  amount               Float
-  currency             String
-  paymentProvider      String
-  paymentMethod        String?
-  transactionReference String        @unique
-  paymentStatus        PaymentStatus @default(pending)
-  providerResponseJson Json?
-  paidAt               DateTime?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  @@map("bookings")
 }
 
 model Review {
@@ -191,6 +171,7 @@ model Review {
   createdAt  DateTime @default(now())
 
   @@unique([reviewerId, propertyId])
+  @@map("reviews")
 }
 
 model Chat {
@@ -198,6 +179,8 @@ model Chat {
   createdAt    DateTime          @default(now())
   participants ChatParticipant[]
   messages     Message[]
+
+  @@map("chats")
 }
 
 model ChatParticipant {
@@ -207,6 +190,7 @@ model ChatParticipant {
   userId String
 
   @@id([chatId, userId])
+  @@map("chat_participants")
 }
 
 model Message {
@@ -218,27 +202,8 @@ model Message {
   message   String
   isAi      Boolean  @default(false)
   createdAt DateTime @default(now())
-}
 
-model ChatbotLog {
-  id        String   @id @default(uuid())
-  user      User?    @relation(fields: [userId], references: [id])
-  userId    String?
-  prompt    String
-  response  String
-  intent    String?
-  createdAt DateTime @default(now())
-}
-
-model AdminAction {
-  id           String   @id @default(uuid())
-  admin        User?    @relation("AdminActions", fields: [adminId], references: [id])
-  adminId      String?
-  actionType   String
-  targetEntity String
-  targetId     String?
-  notes        String?
-  createdAt    DateTime @default(now())
+  @@map("messages")
 }
 
 model Notification {
@@ -250,4 +215,19 @@ model Notification {
   isRead    Boolean   @default(false)
   readAt    DateTime?
   createdAt DateTime  @default(now())
+
+  @@map("notifications")
+}
+
+model AdminAction {
+  id           String   @id @default(uuid())
+  admin        User?    @relation("AdminActions", fields: [adminId], references: [id])
+  adminId      String?
+  actionType   String
+  targetEntity String
+  targetId     String?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  @@map("admin_actions")
 }

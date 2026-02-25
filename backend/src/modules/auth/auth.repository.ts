@@ -13,11 +13,12 @@ export const createUser = async (data: {
 }): Promise<User> => {
   const passwordHash = data.provider === "local" ? await bcrypt.hash(data.password, 12) : "";
 
+  const username = data.username ?? data.email.split("@")[0] + "_" + Math.floor(Math.random() * 10000);
   return prisma.user.create({
     data: {
       email: data.email,
       fullName: data.fullName,
-      username: data.username,
+      username,
       passwordHash,
       provider: data.provider || "local",
       providerId: data.providerId,

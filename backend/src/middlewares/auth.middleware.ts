@@ -1,18 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-export const authenticateJWT = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
+const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
-  if (!authHeader) return res.status(401).json({ success: false, message: "Missing token" });
+export const verifyToken = (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ message: "No token provided" });
 
   const token = authHeader.split(" ")[1];
-
-  jwt.verify(token, process.env.JWT_ACCESS_SECRET!, (err, decoded) => {
-    if (err) return res.status(403).json({ success: false, message: "Invalid or expired token" });
-
-    // Attach decoded info to request object
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
     (req as any).user = decoded;
     next();
-  });
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
 };
