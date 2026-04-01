@@ -1,3 +1,4 @@
+// backend/src/modules/auth/auth.controller.ts
 import { Request, Response, NextFunction } from "express";
 import * as AuthService from "./auth.service";
 import { sendResponse } from "../../utils/response";
