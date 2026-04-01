@@ -1,20 +1,27 @@
 import { Router } from "express";
-import { 
-  rentProperty, 
-  cancelBooking, 
-  getMyBookings 
-} from "./booking.controller";
 import { verifyToken } from "../../middlewares/auth.middleware";
+import { 
+  createBooking, 
+  getUserBookings, 
+  getBookingById, 
+  cancelBooking 
+} from "./booking.controller";
 
 const router = Router();
 
-// Get list of all my bookings (as renter or owner)
-router.get("/my-bookings", verifyToken, getMyBookings);
+// All booking routes require authentication
+router.use(verifyToken);
 
 // Create a new booking
-router.post("/rent", verifyToken, rentProperty);
+router.post("/", createBooking);
 
-// Cancel an existing booking
-router.patch("/:bookingId/cancel", verifyToken, cancelBooking);
+// Get all bookings for current user
+router.get("/", getUserBookings);
+
+// Get a specific booking
+router.get("/:id", getBookingById);
+
+// Cancel a booking
+router.patch("/:id/cancel", cancelBooking);
 
 export default router;

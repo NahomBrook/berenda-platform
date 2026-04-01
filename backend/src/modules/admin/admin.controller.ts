@@ -3,49 +3,26 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-/**
- * ANALYTICS: Provides a bird's-eye view of the platform activities
- */
-export const getAdminAnalytics = async (req: Request, res: Response) => {
+export const getAdminDashboard = async (req: Request, res: Response) => {
   try {
-    // Running counts in parallel for performance
-    const [totalUsers, totalProperties, totalBookings, bookingStats] = await Promise.all([
-      prisma.user.count(),
-      prisma.property.count({ where: { deletedAt: null } }),
-      prisma.booking.count(),
-      prisma.booking.groupBy({
-        by: ['status'],
-        _count: { _all: true }
-      })
-    ]);
-
-    // Group properties by location for geographic distribution data
-    const propertiesByLocation = await prisma.property.groupBy({
-      by: ['location'],
-      _count: { _all: true },
-      where: { deletedAt: null }
-    });
-
-    res.status(200).json({
+    const totalUsers = await prisma.user.count();
+    const totalProperties = await prisma.property.count();
+    const totalBookings = await prisma.booking.count();
+    
+    res.json({
       success: true,
       data: {
-        summary: {
-          users: totalUsers,
-          activeProperties: totalProperties,
-          totalBookings: totalBookings
-        },
-        bookingBreakdown: bookingStats,
-        geographicDistribution: propertiesByLocation
+        totalUsers,
+        totalProperties,
+        totalBookings
       }
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+  } catch (error) {
+    console.error("Error in getAdminDashboard:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-/**
- * USER MANAGEMENT: List all users with their activity counts
- */
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
@@ -53,60 +30,65 @@ export const getAllUsers = async (req: Request, res: Response) => {
         id: true,
         fullName: true,
         email: true,
-        roles: true,
-        createdAt: true,
-        _count: {
+        username: true,
+        isVerified: true,
+        createdAt: true
+      }
+    });
+    res.json({ success: true, users });
+  } catch (error) {
+    console.error("Error in getAllUsers:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+export const getAllProperties = async (req: Request, res: Response) => {
+  try {
+    const properties = await prisma.property.findMany({
+      include: {
+        owner: {
           select: {
-            properties: true,
-            bookings: true
+            fullName: true,
+            email: true
           }
         }
-      },
-      orderBy: { createdAt: 'desc' }
+      }
     });
-
-    res.status(200).json({ success: true, count: users.length, data: users });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    res.json({ success: true, properties });
+  } catch (error) {
+    console.error("Error in getAllProperties:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-/**
- * USER MANAGEMENT: Permanent removal of a user
- */
-export const adminDeleteUser = async (req: Request, res: Response) => {
+export const approveProperty = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const { propertyId } = req.params;
     
-    // Check if user exists before deleting
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    await prisma.user.delete({ where: { id } });
+    const property = await prisma.property.update({
+      where: { id: propertyId },
+      data: { approvalStatus: "approved" }
+    });
     
-    res.status(200).json({ success: true, message: "User permanently removed from platform" });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    res.json({ success: true, property });
+  } catch (error) {
+    console.error("Error in approveProperty:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-/**
- * PROPERTY MANAGEMENT: Admin can soft-delete any property (God Mode)
- */
-export const adminDeleteProperty = async (req: Request, res: Response) => {
+export const rejectProperty = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-
-    const property = await prisma.property.findUnique({ where: { id } });
-    if (!property) return res.status(404).json({ message: "Property not found" });
-
-    await prisma.property.update({
-      where: { id },
-      data: { deletedAt: new Date() }
+    const { propertyId } = req.params;
+    
+    const property = await prisma.property.update({
+      where: { id: propertyId },
+      data: { approvalStatus: "rejected" }
     });
-
-    res.status(200).json({ success: true, message: "Property removed by administrative action" });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    
+    res.json({ success: true, property });
+  } catch (error) {
+    console.error("Error in rejectProperty:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
