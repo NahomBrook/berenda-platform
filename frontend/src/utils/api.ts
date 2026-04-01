@@ -1,4 +1,4 @@
-// src/utils/api.ts
+// frontend/src/utils/api.ts
 // Centralize backend base URL for all API calls.
 // In Next.js, NEXT_PUBLIC_* vars are inlined at build time for client components.
 export const API_BASE_URL =
@@ -17,9 +17,17 @@ export async function registerUser(fullName: string, email: string, password: st
     throw new Error(errorData.message || "Registration failed");
   }
 
-  const data = await res.json();
-  localStorage.setItem("token", data.token);
-  localStorage.setItem("user", JSON.stringify(data.user));
+  const response = await res.json();
+  // Handle both response formats (direct or nested under 'data')
+  const data = response.data || response;
+  
+  if (data.token) {
+    localStorage.setItem("token", data.token);
+  }
+  if (data.user) {
+    localStorage.setItem("user", JSON.stringify(data.user));
+  }
+  
   return data.user;
 }
 
@@ -35,9 +43,17 @@ export async function loginUser(email: string, password: string) {
     throw new Error(errorData.message || "Login failed");
   }
 
-  const data = await res.json();
-  localStorage.setItem("token", data.token);
-  localStorage.setItem("user", JSON.stringify(data.user));
+  const response = await res.json();
+  // Handle both response formats (direct or nested under 'data')
+  const data = response.data || response;
+  
+  if (data.token) {
+    localStorage.setItem("token", data.token);
+  }
+  if (data.user) {
+    localStorage.setItem("user", JSON.stringify(data.user));
+  }
+  
   return data.user;
 }
 
@@ -157,7 +173,7 @@ export async function uploadPropertyImages(propertyId: string, files: File[]) {
   return await res.json();
 }
 
-// ==================== NEW ELIGIBILITY CHECK FUNCTION ====================
+// ==================== ELIGIBILITY CHECK FUNCTION ====================
 
 export interface EligibilityCheckData {
   checkIn: string;
