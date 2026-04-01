@@ -20,5 +20,5 @@
     "allowJs": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/chat", "src/modules/chat", "src/modules/payments", "src/modules/admin", "src/modules/bookings"]
+  "exclude": ["node_modules", "dist"]
 }
