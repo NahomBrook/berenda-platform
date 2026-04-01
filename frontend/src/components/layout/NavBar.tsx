@@ -1,9 +1,10 @@
-// components/Navbar.tsx
+// frontend/src/components/layout/NavBar.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { Globe, User, MessageCircle, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface NavbarProps {
   onSearchClick?: () => void;
@@ -15,40 +16,29 @@ export default function Navbar({ onSearchClick, showSearchButton = false }: Navb
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [user, setUser] = useState<{ fullName: string } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { toggleLanguage, t } = useLanguage();
 
   // Check for authenticated user on load
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
       const storedUser = localStorage.getItem("user");
-      setUser(storedUser ? JSON.parse(storedUser) : { fullName: "User" });
-      fetchUnreadCount();
-    }
-  }, []);
-
-  const fetchUnreadCount = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chats/unread`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUnreadCount(data.count || 0);
+      // Handle case where storedUser is "undefined" string or null
+      if (storedUser && storedUser !== "undefined") {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error("Failed to parse user:", e);
+          setUser({ fullName: "User" });
+        }
+      } else {
+        setUser({ fullName: "User" });
       }
-    } catch (err) {
-      console.error("Error fetching unread count:", err);
+      //fetchUnreadCount();
     }
-  };
-
-  // Poll for unread messages every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
   }, []);
+
+  
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -86,7 +76,7 @@ export default function Navbar({ onSearchClick, showSearchButton = false }: Navb
           className="cursor-pointer hover:text-gray-900 transition-colors" 
           onClick={() => router.push("/")}
         >
-          Home
+          {t('Home')}
         </span>
         
         {/* Search Link - Appears when scrolled */}
@@ -96,7 +86,7 @@ export default function Navbar({ onSearchClick, showSearchButton = false }: Navb
             onClick={handleSearchClick}
           >
             <Search className="w-4 h-4" />
-            Search
+            {t('search')}
           </span>
         )}
       </div>
@@ -118,7 +108,7 @@ export default function Navbar({ onSearchClick, showSearchButton = false }: Navb
           className="hidden md:block cursor-pointer hover:text-gray-900 transition-colors"
           onClick={handleHostClick}
         >
-          Host a berenda
+          {t('+ Host a Berenda')}
         </span>
 
         {/* Chat Button */}
@@ -133,6 +123,12 @@ export default function Navbar({ onSearchClick, showSearchButton = false }: Navb
             </span>
           )}
         </button>
+
+        {/* Globe / Language */}
+        <Globe 
+          className="w-5 h-5 cursor-pointer text-gray-700 hover:text-gray-900 transition-colors" 
+          onClick={toggleLanguage}
+        />
 
         {/* Profile / Auth Dropdown */}
         <div
@@ -150,13 +146,13 @@ export default function Navbar({ onSearchClick, showSearchButton = false }: Navb
                   className="px-4 py-2 text-left hover:bg-gray-100 transition-colors"
                   onClick={() => router.push("/auth/register")}
                 >
-                  Register
+                  {t('register')}
                 </button>
                 <button
                   className="px-4 py-2 text-left hover:bg-gray-100 transition-colors"
                   onClick={() => router.push("/auth/login")}
                 >
-                  Login
+                  {t('login')}
                 </button>
               </>
             ) : (
@@ -165,13 +161,14 @@ export default function Navbar({ onSearchClick, showSearchButton = false }: Navb
                   className="px-4 py-2 text-left hover:bg-gray-100 transition-colors"
                   onClick={() => router.push("/profile")}
                 >
-                  Profile
+                  {t('profile')}
                 </button>
+                
                 <button
                   className="px-4 py-2 text-left hover:bg-gray-100 transition-colors"
                   onClick={handleLogout}
                 >
-                  Logout
+                  {t('logout')}
                 </button>
               </>
             )}

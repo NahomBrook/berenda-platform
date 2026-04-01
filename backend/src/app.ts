@@ -14,19 +14,21 @@ import aiRoutes from "./modules/ai/ai.routes";
 import paymentRoutes from "./modules/payments/payments.routes";
 
 const app = express();
-const YOUR_IP = '192.168.1.2';
 
 // Security middlewares
 app.use(helmet());
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    `http://${YOUR_IP}:3000`,
     'http://localhost:5000',
-    `http://${YOUR_IP}:5000`
+    'https://berenda-plc.vercel.app',
+    'https://berenda-41a2.vercel.app',
+    'https://berenda-backend.vercel.app',
+    'https://berenda-xdr9.vercel.app',
+    /\.vercel\.app$/,
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
@@ -34,22 +36,42 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
-app.use("/api/ai", aiRoutes);
 
 // Static files for uploads
 app.use("/uploads", express.static("uploads"));
 
-// Routes - ORDER MATTERS! Put more specific routes first
+// ==================== PUBLIC ROUTES (No Auth) ====================
+// Health check - useful for monitoring
+app.get("/api/health", (req: Request, res: Response) => {
+  res.status(200).json({
+    status: "ok",
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// AI test endpoint
+app.get("/api/ai/test", (req: Request, res: Response) => {
+  res.json({
+    message: "AI routes are working!",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ==================== API ROUTES ====================
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/properties", propertyRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/chats", chatRoutes); // Chat routes
-app.use("/api/locations", locationRoutes); // Location routes
+app.use("/api/chats", chatRoutes);
+app.use("/api/locations", locationRoutes);
+app.use("/api/ai", aiRoutes);
 app.use("/api/payments", paymentRoutes);
 
-// Health check - should be before 404 handler
+// ==================== LEGACY HEALTH CHECK ====================
+// Keep for backward compatibility
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
     status: "ok",
@@ -59,7 +81,7 @@ app.get("/health", (req: Request, res: Response) => {
   });
 });
 
-// 404 handler - catch all unmatched routes
+// ==================== 404 HANDLER ====================
 app.use((req: Request, res: Response) => {
   res.status(404).json({ 
     success: false,
@@ -69,11 +91,10 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-// Centralized error handler - must be last
+// ==================== CENTRALIZED ERROR HANDLER ====================
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err.stack || err);
   
-  // Handle specific error types
   if (err.name === 'UnauthorizedError') {
     return res.status(401).json({
       success: false,

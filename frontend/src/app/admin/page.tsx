@@ -1,150 +1,125 @@
+// frontend/src/app/admin/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllUsers, getAllProperties, getAllBookings, updatePropertyStatus } from "../../utils/adminApi";
+import { useRouter } from "next/navigation";
+import { getDashboardStats } from "@/utils/adminApi";
 
-export default function AdminDashboard() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [properties, setProperties] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"users" | "properties" | "bookings">("users");
+// Components
+import StatsCards from "@/components/admin/StatsCards";
+import UsersTable from "@/components/admin/UsersTable";
+import PropertiesTable from "@/components/admin/PropertiesTable";
+import BookingsTable from "@/components/admin/BookingsTable";
+import ActionsTable from "@/components/admin/ActionsTable";
+import Sidebar from "@/components/admin/Sidebar";
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+type TabType = "dashboard" | "users" | "properties" | "bookings" | "actions";
 
+export default function AdminPage() {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabType>("dashboard");
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [properties, setProperties] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 1 });
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check authentication and admin role
   useEffect(() => {
-    if (!token) return;
+    const token = localStorage.getItem("token");
+    const userStr = localStorage.getItem("user");
+    
+    if (!token) {
+      router.push("/auth/login");
+      return;
+    }
+    
+    try {
+      const user = JSON.parse(userStr || "{}");
+      // Prefer role-based check; fallback to email for older accounts
+      const role = typeof user.role === "string" ? user.role.toUpperCase() : (user.roles ? "ADMIN" : "");
+      if (role === "ADMIN" || role === "SUPERADMIN" || user.email === "admin@berenda.com") {
+        setIsAdmin(true);
+        fetchData();
+      } else {
+        router.push("/");
+      }
+    } catch (error) {
+      console.error("Error parsing user:", error);
+      router.push("/auth/login");
+    }
+  }, [activeTab, pagination.page, search, filter]);
 
-    getAllUsers(token).then((data) => setUsers(data.data || []));
-    getAllProperties(token).then((data) => setProperties(data.data || []));
-    getAllBookings(token).then((data) => setBookings(data.data || []));
-  }, [token]);
-
-  const handleApprove = async (propertyId: string) => {
-    if (!token) return;
-    await updatePropertyStatus(token, propertyId, "approved");
-    setProperties(properties.map(p => p.id === propertyId ? { ...p, approvalStatus: "approved" } : p));
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      if (activeTab === "dashboard") {
+        const res = await getDashboardStats();
+        setStats(res.data);
+      }
+      // Add other fetch calls for users, properties, bookings here
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReject = async (propertyId: string) => {
-    if (!token) return;
-    await updatePropertyStatus(token, propertyId, "rejected");
-    setProperties(properties.map(p => p.id === propertyId ? { ...p, approvalStatus: "rejected" } : p));
-  };
+  if (!isAdmin) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && activeTab === "dashboard") {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-white p-6">
-        <h2 className="text-2xl font-bold mb-8">Admin Dashboard</h2>
-        <ul>
-          <li
-            className={`mb-4 cursor-pointer ${activeTab === "users" ? "font-bold" : ""}`}
-            onClick={() => setActiveTab("users")}
-          >
-            Users
-          </li>
-          <li
-            className={`mb-4 cursor-pointer ${activeTab === "properties" ? "font-bold" : ""}`}
-            onClick={() => setActiveTab("properties")}
-          >
-            Properties
-          </li>
-          <li
-            className={`mb-4 cursor-pointer ${activeTab === "bookings" ? "font-bold" : ""}`}
-            onClick={() => setActiveTab("bookings")}
-          >
-            Bookings
-          </li>
-        </ul>
-      </aside>
+    <div className="flex h-screen bg-gray-100">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      
+      <main className="flex-1 overflow-auto">
+        <div className="p-6">
+          {activeTab === "dashboard" && stats && <StatsCards stats={stats} />}
+          
+          {activeTab === "users" && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <UsersTable />
+            </div>
+          )}
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 bg-gray-100 overflow-auto">
-        <h1 className="text-3xl font-bold mb-6">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h1>
+          {activeTab === "properties" && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <PropertiesTable />
+            </div>
+          )}
 
-        {activeTab === "users" && (
-          <table className="min-w-full bg-white shadow rounded">
-            <thead>
-              <tr className="bg-gray-200">
-                <th className="p-2">Full Name</th>
-                <th className="p-2">Email</th>
-                <th className="p-2">Username</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(user => (
-                <tr key={user.id} className="border-b">
-                  <td className="p-2">{user.fullName}</td>
-                  <td className="p-2">{user.email}</td>
-                  <td className="p-2">{user.username}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+          {activeTab === "bookings" && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <BookingsTable />
+            </div>
+          )}
 
-        {activeTab === "properties" && (
-          <table className="min-w-full bg-white shadow rounded">
-            <thead>
-              <tr className="bg-gray-200">
-                <th className="p-2">Title</th>
-                <th className="p-2">Owner</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {properties.map(property => (
-                <tr key={property.id} className="border-b">
-                  <td className="p-2">{property.title}</td>
-                  <td className="p-2">{property.owner.fullName}</td>
-                  <td className="p-2">{property.approvalStatus}</td>
-                  <td className="p-2 space-x-2">
-                    {property.approvalStatus === "pending" && (
-                      <>
-                        <button
-                          className="px-3 py-1 bg-green-500 text-white rounded"
-                          onClick={() => handleApprove(property.id)}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          className="px-3 py-1 bg-red-500 text-white rounded"
-                          onClick={() => handleReject(property.id)}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {activeTab === "bookings" && (
-          <table className="min-w-full bg-white shadow rounded">
-            <thead>
-              <tr className="bg-gray-200">
-                <th className="p-2">Booking ID</th>
-                <th className="p-2">Property</th>
-                <th className="p-2">User</th>
-                <th className="p-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bookings.map(booking => (
-                <tr key={booking.id} className="border-b">
-                  <td className="p-2">{booking.id}</td>
-                  <td className="p-2">{booking.property.title}</td>
-                  <td className="p-2">{booking.user.fullName}</td>
-                  <td className="p-2">{booking.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+          {activeTab === "actions" && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <ActionsTable />
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

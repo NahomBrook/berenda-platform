@@ -116,6 +116,10 @@ export const getProperties = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error fetching properties:', error);
+    // Prisma-specific error when DB cannot be reached
+    if (error?.code === 'P1001' || /Can't reach database server/.test(String(error?.message))) {
+      return res.status(503).json({ success: false, message: 'Database unreachable. Please check DATABASE_URL and database server.' });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };

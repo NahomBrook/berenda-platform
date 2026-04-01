@@ -1,40 +1,47 @@
-const https = require("https");
-const CHAPA_SECRET_KEY = process.env.CHAPA_SECRET_KEY || "CHAPA_TEST-XXXXXXXXXXXXXXXXXXXXXXXX";
+require('dotenv').config();
 
-const chapaPayload = JSON.stringify({
-    amount: 100,
-    currency: "USD",
-    email: "test@example.com",
-    first_name: "John",
-    last_name: "Doe",
-    phone_number: "0900000000",
-    tx_ref: `test-tx-${Date.now()}`,
-    callback_url: `http://localhost:5000/api/payments/webhook`,
-    return_url: `http://localhost:3000/payment/verify?tx_ref=test-tx-${Date.now()}`
-});
+const CHAPA_SECRET_KEY = process.env.CHAPA_SECRET_KEY;
 
-console.log("Testing Chapa Initialization API...");
-
-const req = https.request(
-    "https://api.chapa.co/v1/transaction/initialize",
-    {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${CHAPA_SECRET_KEY}`,
-            "Content-Type": "application/json",
-            "Content-Length": Buffer.byteLength(chapaPayload)
-        }
-    },
-    (res) => {
-        let output = "";
-        res.on("data", (chunk) => output += chunk);
-        res.on("end", () => {
-             console.log("Status Code:", res.statusCode);
-             console.log("Response Body:", output);
-        });
+async function testChapa() {
+  console.log('🔑 Testing Chapa API...');
+  console.log('Key loaded:', CHAPA_SECRET_KEY ? 'Yes' : 'No');
+  
+  if (!CHAPA_SECRET_KEY) {
+    console.log('❌ CHAPA_SECRET_KEY not found in environment');
+    return;
+  }
+  
+  try {
+    const response = await fetch('https://api.chapa.co/v1/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CHAPA_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: '10',
+        currency: 'ETB',
+        email: 'test@berenda.com',
+        tx_ref: `test_${Date.now()}`,
+        first_name: 'Test',
+        last_name: 'User',
+        callback_url: 'http://localhost:5000/api/payments/webhook',
+        return_url: 'http://localhost:3000/payment/verify',
+      }),
+    });
+    
+    const data = await response.json();
+    console.log('Response status:', response.status);
+    
+    if (response.ok) {
+      console.log('✅ Chapa API is working!');
+      console.log('Checkout URL:', data.data?.checkout_url);
+    } else {
+      console.log('❌ Chapa API error:', data.message || data);
     }
-);
+  } catch (error) {
+    console.error('❌ Connection error:', error.message);
+  }
+}
 
-req.on("error", (error) => console.error("Error:", error.message));
-req.write(chapaPayload);
-req.end();
+testChapa();

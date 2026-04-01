@@ -24,6 +24,16 @@ const Popup = dynamic(
   { ssr: false }
 );
 
+// Map click handler component using react-leaflet's useMapEvents
+function MapClickHandler({ onClick }: { onClick: (e: any) => void }) {
+  // dynamically require to avoid SSR issues
+  const { useMapEvents } = require('react-leaflet');
+  useMapEvents({
+    click: (e: any) => onClick && onClick(e),
+  });
+  return null;
+}
+
 // Import Leaflet CSS
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -314,12 +324,8 @@ export default function HostPropertyPage() {
               Click on the map to set your property location *
             </label>
             <div className={`h-96 rounded-lg overflow-hidden border-2 ${!mapSelected ? 'border-red-500' : 'border-gray-300'}`}>
-              <MapContainer
-                center={mapCenter}
-                zoom={mapZoom}
-                style={{ height: "100%", width: "100%" }}
-                onClick={handleMapClick}
-              >
+              <MapContainer center={mapCenter} zoom={mapZoom} style={{ height: "100%", width: "100%" }}>
+                <MapClickHandler onClick={handleMapClick} />
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

@@ -1,7 +1,7 @@
 // components/DateRangePicker.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, ArrowRight } from "lucide-react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isBefore, startOfDay } from "date-fns";
 
@@ -34,7 +34,7 @@ export function DateRangePicker({
   const [animateDate, setAnimateDate] = useState<string | null>(null);
 
   // Animation effect when dates are selected
-  useState(() => {
+  useEffect(() => {
     if (selectedCheckIn) {
       setAnimateDate("checkin");
       const timer = setTimeout(() => setAnimateDate(null), 500);
@@ -42,7 +42,7 @@ export function DateRangePicker({
     }
   }, [selectedCheckIn]);
 
-  useState(() => {
+  useEffect(() => {
     if (selectedCheckOut) {
       setAnimateDate("checkout");
       const timer = setTimeout(() => setAnimateDate(null), 500);

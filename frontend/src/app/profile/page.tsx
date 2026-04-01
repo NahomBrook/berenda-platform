@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { getProfile, updateProfile, uploadProfileImage } from "../../utils/profileApi";
 import Navbar from "@/components/layout/NavBar";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Tab {
   name: string;
@@ -51,6 +52,7 @@ interface WishlistItem {
 
 export default function ProfileDashboard() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [user, setUser] = useState<any>(null);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ fullName: "", email: "", phone: "" });
@@ -236,8 +238,8 @@ export default function ProfileDashboard() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
-          <p className="text-gray-600 mt-2">Manage your profile, bookings, and preferences</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("profile.title")}</h1>
+          <p className="text-gray-600 mt-2">{t("profile.subtitle")}</p>
         </div>
 
         {/* Message Toast */}
@@ -325,16 +327,16 @@ export default function ProfileDashboard() {
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h2 className="text-2xl font-semibold text-gray-900">Profile Information</h2>
-                      <p className="text-gray-600 mt-1">Update your personal details</p>
+                        <h2 className="text-2xl font-semibold text-gray-900">{t("profile.tab.profile")}</h2>
+                        <p className="text-gray-600 mt-1">{t("profile.subtitle")}</p>
                     </div>
                     {!editing && (
                       <button
                         onClick={() => setEditing(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition"
                       >
-                        <Edit2 className="w-4 h-4" />
-                        Edit Profile
+                          <Edit2 className="w-4 h-4" />
+                          {t("profile.editProfile")}
                       </button>
                     )}
                   </div>
@@ -452,20 +454,20 @@ export default function ProfileDashboard() {
             {activeTab.key === "bookings" && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
-                  <h2 className="text-2xl font-semibold text-gray-900">My Bookings</h2>
-                  <p className="text-gray-600 mt-1">View and manage your reservations</p>
+                      <h2 className="text-2xl font-semibold text-gray-900">{t("bookings.title")}</h2>
+                      <p className="text-gray-600 mt-1">{t("bookings.title")}</p>
                 </div>
 
                 <div className="p-6">
                   {bookings.length === 0 ? (
                     <div className="text-center py-12">
                       <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-500">No bookings yet</p>
+                      <p className="text-gray-500">{t("bookings.noBookings")}</p>
                       <button 
                         onClick={() => router.push("/")}
                         className="mt-4 text-red-500 hover:text-red-600 font-medium"
                       >
-                        Start exploring properties →
+                        {t("profile.startExploring")}
                       </button>
                     </div>
                   ) : (
@@ -514,15 +516,15 @@ export default function ProfileDashboard() {
             {activeTab.key === "wishlist" && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
-                  <h2 className="text-2xl font-semibold text-gray-900">My Wishlist</h2>
-                  <p className="text-gray-600 mt-1">Your favorite properties</p>
+                  <h2 className="text-2xl font-semibold text-gray-900">{t("profile.tab.wishlist")}</h2>
+                  <p className="text-gray-600 mt-1">{t("profile.tab.wishlist")}</p>
                 </div>
 
                 <div className="p-6">
                   {wishlist.length === 0 ? (
                     <div className="text-center py-12">
                       <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-500">Your wishlist is empty</p>
+                      <p className="text-gray-500">{t("bookings.noBookings")}</p>
                       <button 
                         onClick={() => router.push("/")}
                         className="mt-4 text-red-500 hover:text-red-600 font-medium"
@@ -560,14 +562,14 @@ export default function ProfileDashboard() {
             {activeTab.key === "settings" && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
-                  <h2 className="text-2xl font-semibold text-gray-900">Account Settings</h2>
-                  <p className="text-gray-600 mt-1">Manage your account preferences</p>
+                  <h2 className="text-2xl font-semibold text-gray-900">{t("profile.tab.settings")}</h2>
+                  <p className="text-gray-600 mt-1">{t("profile.tab.settings")}</p>
                 </div>
 
                 <div className="p-6">
                   <div className="space-y-6">
                     <div>
-                      <h3 className="font-medium text-gray-900 mb-3">Notifications</h3>
+                      <h3 className="font-medium text-gray-900 mb-3">{t("profile.tab.settings")}</h3>
                       <div className="space-y-3">
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input type="checkbox" className="w-4 h-4 text-red-500 rounded" />
@@ -608,7 +610,7 @@ export default function ProfileDashboard() {
 
                     <div className="pt-6">
                       <button className="px-6 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition">
-                        Save Settings
+                        {t("profile.saveChanges")}
                       </button>
                     </div>
                   </div>

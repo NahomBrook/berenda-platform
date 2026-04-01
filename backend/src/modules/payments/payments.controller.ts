@@ -125,8 +125,10 @@ export const initializePayment = async (req: Request, res: Response) => {
     });
 
     // Create Payment Record
-    const txRef = `tx-${booking.id}-${Date.now()}`;
-    const payment = await prisma.payment.create({
+    const txRef = 
+`ber-${Date.now()}-${Math.random().toString(36).substring(2, 
+10)}`;    const payment = await 
+prisma.payment.create({
       data: {
         bookingId: booking.id,
         txRef,

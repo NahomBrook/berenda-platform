@@ -1,16 +1,17 @@
+// backend/src/middlewares/auth.middleware.ts
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import prisma from "../lib/prisma";
 
 // Use the same JWT_SECRET that was used to sign the tokens
 const JWT_SECRET = process.env.JWT_SECRET || "superlongrandomaccesssecret";
 
-export const verifyToken = (req: Request, res: Response, next: NextFunction) => {
+export const verifyToken = async (req: Request, res: Response, next: NextFunction) => {
   console.log("=== Auth Middleware Debug ===");
   console.log("JWT_SECRET used:", JWT_SECRET ? "Secret is set" : "Secret is MISSING");
-  console.log("JWT_SECRET value:", JWT_SECRET); // Be careful with this in production
   
   const authHeader = req.headers.authorization;
-  console.log("Auth Header:", authHeader);
+  console.log("Auth Header:", authHeader ? "Present" : "Missing");
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     console.log("No valid Bearer token found");
@@ -25,12 +26,41 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
 
   try {
     console.log("Attempting to verify token...");
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
     console.log("Token verified successfully!");
-    console.log("Decoded user:", decoded);
     
-    // Attach the decoded payload to the request object
-    (req as any).user = decoded;
+    // Fetch user from database with roles
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      include: {
+        roles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+    
+    if (!user) {
+      console.log("User not found in database");
+      return res.status(401).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+    
+    // Attach user info to request
+    (req as any).user = {
+      userId: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      roles: user.roles.map(r => r.role.name),
+      isAdmin: user.roles.some(r => r.role.name === "ADMIN" || r.role.name === "admin"),
+      isSuperAdmin: user.roles.some(r => r.role.name === "SUPER_ADMIN" || r.role.name === "super_admin"),
+    };
+    
+    console.log("User roles:", (req as any).user.roles);
+    console.log("Is Admin:", (req as any).user.isAdmin);
     
     next();
   } catch (err: any) {
@@ -45,17 +75,43 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
     });
   }
 };
+
 export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   const user = (req as any).user;
   
-  // Check if user has admin role
-  // You might need to adjust this based on how roles are stored in your token
-  if (user && (user.role === "admin" || (user.roles && user.roles.includes("admin")))) {
+  if (!user) {
+    return res.status(401).json({ 
+      success: false, 
+      message: "Authentication required" 
+    });
+  }
+  
+  if (user.isAdmin) {
     next();
   } else {
     res.status(403).json({ 
       success: false, 
-      message: "Access denied: Admins only" 
+      message: "Access denied: Admin privileges required" 
+    });
+  }
+};
+
+export const isSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
+  const user = (req as any).user;
+  
+  if (!user) {
+    return res.status(401).json({ 
+      success: false, 
+      message: "Authentication required" 
+    });
+  }
+  
+  if (user.isSuperAdmin) {
+    next();
+  } else {
+    res.status(403).json({ 
+      success: false, 
+      message: "Access denied: Super Admin privileges required" 
     });
   }
 };

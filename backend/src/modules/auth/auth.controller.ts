@@ -1,76 +1,34 @@
-import { Request, Response } from "express";
-import * as authRepo from "./auth.repository";
-import jwt from "jsonwebtoken";
+import { Request, Response, NextFunction } from "express";
+import * as AuthService from "./auth.service";
+import { sendResponse } from "../../utils/response";
 
-const JWT_SECRET = process.env.JWT_ACCESS_SECRET;
-const JWT_EXPIRES = process.env.JWT_ACCESS_EXPIRES || "15m";
-
-if (!JWT_SECRET) {
-  throw new Error("JWT_ACCESS_SECRET is not defined in environment variables");
-}
-
-// Helper to auto-generate a username
-const generateUsername = (fullName: string) => {
-  return (
-    fullName.replace(/\s+/g, "").toLowerCase() +
-    Math.floor(Math.random() * 1000)
-  );
-};
-
-// Helper to remove sensitive fields
-const sanitizeUser = (user: any) => {
-  const { passwordHash, ...safeUser } = user;
-  return safeUser;
-};
-
-// ==========================
-// LOCAL REGISTER
-// ==========================
-export const register = async (req: Request, res: Response) => {
+export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, fullName, password, username } = req.body;
+    const { email, password, fullName, role } = req.body;
 
-    // Validate required input
-    if (!email || !fullName || !password) {
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Email, fullName, and password are required",
+        message: "Email and password are required",
       });
     }
 
-    const usernameToUse = username || generateUsername(fullName);
-
-    const user = await authRepo.createUser({
-      email,
-      fullName,
-      password,
-      username: usernameToUse,
-      provider: "local",
-    });
-
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
-    );
-
-    return res.status(201).json({
-      success: true,
-      user: sanitizeUser(user),
-      token,
+    const user = await AuthService.registerUser(email, password, role || "USER", fullName);
+    
+    sendResponse(res, 201, "User registered", { 
+      id: user.id, 
+      email: user.email, 
+      fullName: user.fullName,
+      username: user.username,
+      isVerified: user.isVerified,
+      roles: user.roles?.map(r => ({ name: r.role.name })) || []
     });
   } catch (err: any) {
-    return res.status(400).json({
-      success: false,
-      message: err.message || "Registration failed",
-    });
+    next(err);
   }
 };
 
-// ==========================
-// LOCAL LOGIN
-// ==========================
-export const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
 
@@ -81,30 +39,53 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
-    const user = await authRepo.validateUser(email, password);
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
-    );
-
-    return res.json({
-      success: true,
-      user: sanitizeUser(user),
+    const { user, token } = await AuthService.loginUser(email, password);
+    
+    sendResponse(res, 200, "Login successful", {
       token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        username: user.username,
+        phone: user.phone,
+        profileImageUrl: user.profileImageUrl,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        roles: user.roles?.map(r => ({ name: r.role.name })) || []
+      },
     });
   } catch (err: any) {
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong",
+    next(err);
+  }
+};
+
+export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: "idToken is required" });
+    }
+
+    const { user, token } = await AuthService.loginWithGoogle(idToken);
+    
+    sendResponse(res, 200, "Login successful", {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        username: user.username,
+        phone: user.phone,
+        profileImageUrl: user.profileImageUrl,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        roles: user.roles?.map(r => ({ name: r.role.name })) || []
+      },
     });
+  } catch (err: any) {
+    next(err);
   }
 };
