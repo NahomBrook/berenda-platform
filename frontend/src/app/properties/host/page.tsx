@@ -72,6 +72,7 @@ const ADDIS_ABABA_AREAS = [
 ];
 
 export default function HostPropertyPage() {
+  const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<HostingStep>(HostingStep.BASIC_INFO);
   const [loading, setLoading] = useState(false);
@@ -103,15 +104,20 @@ export default function HostPropertyPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Check authentication
   useEffect(() => {
+    if (!isMounted) return;
     const token = localStorage.getItem("token");
     if (!token) {
       router.push("/auth/login");
     } else {
       setIsAuthenticated(true);
     }
-  }, [router]);
+  }, [router, isMounted]);
 
   // Search locations
   const searchLocations = useCallback(async (query: string) => {
@@ -133,13 +139,14 @@ export default function HostPropertyPage() {
 
   // Debounced search
   useEffect(() => {
+    if (!isMounted) return;
     const timer = setTimeout(() => {
       if (searchQuery) {
         searchLocations(searchQuery);
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery, searchLocations]);
+  }, [searchQuery, searchLocations, isMounted]);
 
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     setFormData(prev => ({
@@ -360,7 +367,7 @@ export default function HostPropertyPage() {
     }
   };
 
-  if (!isAuthenticated) {
+  if (!isMounted || !isAuthenticated) {
     return null;
   }
 
