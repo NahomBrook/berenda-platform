@@ -1,17 +1,7 @@
-// backend/src/app.ts
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-import propertyRoutes from "./modules/properties/property.routes"; 
-import authRoutes from "./modules/auth/auth.routes";
-import userRoutes from "./modules/users/user.routes";
-import bookingRoutes from "./modules/bookings/booking.routes";
-import adminRoutes from "./modules/admin/admin.routes";
-import chatRoutes from "./modules/chat/chat.routes";
-import locationRoutes from "./modules/locations/location.routes"; 
-import aiRoutes from "./modules/ai/ai.routes";
-import paymentRoutes from "./modules/payments/payments.routes";
 
 const app = express();
 
@@ -21,10 +11,7 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://localhost:5000',
-    'https://berenda-plc.vercel.app',
-    'https://berenda-41a2.vercel.app',
-    'https://berenda-backend.vercel.app',
-    'https://berenda-xdr9.vercel.app',
+    'https://berenda-platform.vercel.app',
     /\.vercel\.app$/,
   ],
   credentials: true,
@@ -37,11 +24,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Static files for uploads
-app.use("/uploads", express.static("uploads"));
-
-// ==================== PUBLIC ROUTES (No Auth) ====================
-// Health check - useful for monitoring
+// ==================== PUBLIC ROUTES ====================
 app.get("/api/health", (req: Request, res: Response) => {
   res.status(200).json({
     status: "ok",
@@ -51,7 +34,6 @@ app.get("/api/health", (req: Request, res: Response) => {
   });
 });
 
-// AI test endpoint
 app.get("/api/ai/test", (req: Request, res: Response) => {
   res.json({
     message: "AI routes are working!",
@@ -59,25 +41,59 @@ app.get("/api/ai/test", (req: Request, res: Response) => {
   });
 });
 
-// ==================== API ROUTES ====================
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/properties", propertyRoutes);
-app.use("/api/bookings", bookingRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/chats", chatRoutes);
-app.use("/api/locations", locationRoutes);
-app.use("/api/ai", aiRoutes);
-app.use("/api/payments", paymentRoutes);
+app.get("/api/properties", (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: [],
+    message: "Properties endpoint is working"
+  });
+});
 
-// ==================== LEGACY HEALTH CHECK ====================
-// Keep for backward compatibility
-app.get("/health", (req: Request, res: Response) => {
-  res.status(200).json({
-    status: "ok",
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+app.post("/api/auth/login", (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  
+  if (email === 'admin@berenda.com' && password === 'Admin123!') {
+    res.json({
+      success: true,
+      data: {
+        token: 'test-token-123',
+        user: {
+          id: '1',
+          email: 'admin@berenda.com',
+          fullName: 'Super Admin',
+          roles: [{ name: 'ADMIN' }]
+        }
+      }
+    });
+  } else {
+    res.status(401).json({ 
+      success: false, 
+      message: 'Invalid credentials' 
+    });
+  }
+});
+
+app.post("/api/auth/register", (req: Request, res: Response) => {
+  const { fullName, email, password } = req.body;
+  
+  if (!fullName || !email || !password) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'All fields are required' 
+    });
+  }
+  
+  res.json({
+    success: true,
+    data: {
+      token: 'test-token-register',
+      user: {
+        id: '2',
+        email,
+        fullName,
+        roles: [{ name: 'USER' }]
+      }
+    }
   });
 });
 
@@ -91,34 +107,14 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-// ==================== CENTRALIZED ERROR HANDLER ====================
+// ==================== ERROR HANDLER ====================
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err.stack || err);
-  
-  if (err.name === 'UnauthorizedError') {
-    return res.status(401).json({
-      success: false,
-      status: 401,
-      message: 'Invalid or missing authentication token',
-      timestamp: new Date().toISOString()
-    });
-  }
-  
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      status: 400,
-      message: err.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-  
-  res.status(err.status || 500).json({
+  res.status(500).json({
     success: false,
-    status: err.status || 500,
+    status: 500,
     message: err.message || "Internal Server Error",
-    timestamp: new Date().toISOString(),
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    timestamp: new Date().toISOString()
   });
 });
 
