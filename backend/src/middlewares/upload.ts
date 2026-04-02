@@ -1,25 +1,33 @@
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
-import cloudinary from "../config/cloudinary";
+import cloudinary from "../../config/cloudinary";
 import path from "path";
 
-// Configure Cloudinary storage for production
-const cloudinaryStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (req: any, file: any) => {
-    return {
-      folder: "berenda_properties",
-      format: "jpg",
-      public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
-    };
-  },
-});
-
-// In serverless env (Vercel) avoid disk writes. Use memory storage as fallback.
+// Use memory storage for Vercel (no disk writes)
 const memoryStorage = multer.memoryStorage();
 
-// Use Cloudinary if configured, otherwise fallback to memory storage
-const storage = process.env.CLOUDINARY_CLOUD_NAME ? cloudinaryStorage : memoryStorage;
+// Configure Cloudinary storage if available
+let storage: any = memoryStorage;
+
+if (process.env.CLOUDINARY_CLOUD_NAME) {
+  try {
+    const cloudinaryStorage = new CloudinaryStorage({
+      cloudinary: cloudinary,
+      params: async (req: any, file: any) => {
+        return {
+          folder: "berenda_properties",
+          format: "jpg",
+          public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
+        };
+      },
+    });
+    storage = cloudinaryStorage;
+    console.log("✅ Cloudinary storage configured");
+  } catch (error) {
+    console.error("❌ Failed to configure Cloudinary storage:", error);
+    storage = memoryStorage;
+  }
+}
 
 const upload = multer({
   storage,

@@ -59,7 +59,7 @@ app.use(cookieParser());
 
 // Static files for uploads - wrapped in try/catch for Vercel
 try {
-  app.use("/uploads", express.static("uploads"));
+  //app.use("/uploads", express.static("uploads"));
 } catch (error) {
   console.log("Uploads directory not available in serverless environment");
 }
