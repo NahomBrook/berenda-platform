@@ -1,13 +1,22 @@
 // backend/src/modules/properties/property.controller.ts
 import { Request, Response } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Helper function to safely get string from query param
-const getStringParam = (param: string | string[] | undefined): string | undefined => {
-  if (!param) return undefined;
-  return Array.isArray(param) ? param[0] : param;
+// Helper function to safely get string from query param (accept ParsedQs or unknown from Express)
+const getStringParam = (param: any): string | undefined => {
+  if (param === undefined || param === null) return undefined;
+  if (Array.isArray(param)) return String(param[0]);
+  return String(param);
+};
+
+// Helper to convert any value to number safely
+const getNumberParam = (param: any): number | undefined => {
+  const str = getStringParam(param);
+  if (str === undefined) return undefined;
+  const num = Number(str);
+  return isNaN(num) ? undefined : num;
 };
 
 // GET ALL (With Full Filters including checkIn/checkOut)
@@ -17,24 +26,21 @@ export const getProperties = async (req: Request, res: Response) => {
       location, 
       minPrice, 
       maxPrice, 
-      status,
       checkIn,
       checkOut,
       bedrooms,
-      homeType,
-      amenities,
       limit = '20',
       offset = '0'
     } = req.query;
 
-    // Build where clause
-    const where: Prisma.PropertyWhereInput = {
+    // Build where clause - using any to bypass strict Prisma typing for complex filters
+    const where: any = {
       deletedAt: null,
       approvalStatus: 'approved',
       isAvailable: true,
     };
 
-    // Location filter - safely convert to string
+    // Location filter
     const locationStr = getStringParam(location);
     if (locationStr && locationStr.trim()) {
       where.location = {
@@ -44,18 +50,18 @@ export const getProperties = async (req: Request, res: Response) => {
     }
 
     // Price range filter
-    if (minPrice || maxPrice) {
+    const minPriceNum = getNumberParam(minPrice);
+    const maxPriceNum = getNumberParam(maxPrice);
+    if (minPriceNum !== undefined || maxPriceNum !== undefined) {
       where.monthlyPrice = {};
-      const minPriceNum = getStringParam(minPrice);
-      const maxPriceNum = getStringParam(maxPrice);
-      if (minPriceNum && Number(minPriceNum) > 0) where.monthlyPrice.gte = Number(minPriceNum);
-      if (maxPriceNum && Number(maxPriceNum) > 0) where.monthlyPrice.lte = Number(maxPriceNum);
+      if (minPriceNum !== undefined && minPriceNum > 0) where.monthlyPrice.gte = minPriceNum;
+      if (maxPriceNum !== undefined && maxPriceNum > 0) where.monthlyPrice.lte = maxPriceNum;
     }
 
     // Bedrooms filter
-    const bedroomsStr = getStringParam(bedrooms);
-    if (bedroomsStr && Number(bedroomsStr) > 0) {
-      where.bedrooms = { gte: Number(bedroomsStr) };
+    const bedroomsNum = getNumberParam(bedrooms);
+    if (bedroomsNum !== undefined && bedroomsNum > 0) {
+      where.bedrooms = { gte: bedroomsNum };
     }
 
     // Date availability filter
@@ -68,22 +74,13 @@ export const getProperties = async (req: Request, res: Response) => {
       where.bookings = {
         none: {
           AND: [
-            { status: 'approved' },
+            { status: { in: ['confirmed', 'approved'] } },
             { startDate: { lt: checkOutDate } },
             { endDate: { gt: checkInDate } }
           ]
         }
       };
     }
-
-    console.log('🔍 Searching properties with filters:', JSON.stringify({
-      location: locationStr,
-      minPrice,
-      maxPrice,
-      checkIn: checkInStr,
-      checkOut: checkOutStr,
-      bedrooms: bedroomsStr
-    }, null, 2));
 
     const properties = await prisma.property.findMany({
       where,
@@ -102,8 +99,8 @@ export const getProperties = async (req: Request, res: Response) => {
         }
       },
       orderBy: { createdAt: 'desc' },
-      take: Number(getStringParam(limit) || '20'),
-      skip: Number(getStringParam(offset) || '0')
+      take: getNumberParam(limit) || 20,
+      skip: getNumberParam(offset) || 0
     });
 
     const total = await prisma.property.count({ where });
@@ -116,7 +113,6 @@ export const getProperties = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error fetching properties:', error);
-    // Prisma-specific error when DB cannot be reached
     if (error?.code === 'P1001' || /Can't reach database server/.test(String(error?.message))) {
       return res.status(503).json({ success: false, message: 'Database unreachable. Please check DATABASE_URL and database server.' });
     }
@@ -135,14 +131,13 @@ export const searchProperties = async (req: Request, res: Response) => {
       isAvailable: true,
     };
 
-    // Safely get string params
     const qStr = getStringParam(q);
     const locationStr = getStringParam(location);
-    const minPriceStr = getStringParam(minPrice);
-    const maxPriceStr = getStringParam(maxPrice);
+    const minPriceNum = getNumberParam(minPrice);
+    const maxPriceNum = getNumberParam(maxPrice);
     const checkInStr = getStringParam(checkIn);
     const checkOutStr = getStringParam(checkOut);
-    const bedroomsStr = getStringParam(bedrooms);
+    const bedroomsNum = getNumberParam(bedrooms);
 
     // Text search
     if (qStr && qStr.trim()) {
@@ -159,15 +154,15 @@ export const searchProperties = async (req: Request, res: Response) => {
     }
 
     // Price range
-    if (minPriceStr || maxPriceStr) {
+    if (minPriceNum !== undefined || maxPriceNum !== undefined) {
       where.monthlyPrice = {};
-      if (minPriceStr && Number(minPriceStr) > 0) where.monthlyPrice.gte = Number(minPriceStr);
-      if (maxPriceStr && Number(maxPriceStr) > 0) where.monthlyPrice.lte = Number(maxPriceStr);
+      if (minPriceNum !== undefined && minPriceNum > 0) where.monthlyPrice.gte = minPriceNum;
+      if (maxPriceNum !== undefined && maxPriceNum > 0) where.monthlyPrice.lte = maxPriceNum;
     }
 
     // Bedrooms
-    if (bedroomsStr && Number(bedroomsStr) > 0) {
-      where.bedrooms = { gte: Number(bedroomsStr) };
+    if (bedroomsNum !== undefined && bedroomsNum > 0) {
+      where.bedrooms = { gte: bedroomsNum };
     }
 
     // Date availability
@@ -178,7 +173,7 @@ export const searchProperties = async (req: Request, res: Response) => {
       where.bookings = {
         none: {
           AND: [
-            { status: 'approved' },
+            { status: { in: ['confirmed', 'approved'] } },
             { startDate: { lt: checkOutDate } },
             { endDate: { gt: checkInDate } }
           ]
@@ -350,17 +345,21 @@ export const uploadPropertyImages = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "No image files provided" });
     }
 
-    const mediaEntries = await Promise.all(
-      files.map((file) =>
-        prisma.propertyMedia.create({
-          data: {
-            propertyId,
-            mediaUrl: file.path,
-            mediaType: "image",
-          },
-        })
-      )
-    );
+    const mediaEntries = [] as any[];
+    for (const file of files) {
+      const url = file.path || file.secure_url || file.location || file.url;
+      if (!url) {
+        return res.status(500).json({
+          success: false,
+          message: "Cloudinary (or remote storage) not configured: uploaded file has no remote URL. Configure CLOUDINARY_* or ensure uploads are handled by a remote storage provider.",
+        });
+      }
+
+      const entry = await prisma.propertyMedia.create({
+        data: { propertyId, mediaUrl: url, mediaType: "image" },
+      });
+      mediaEntries.push(entry);
+    }
 
     res.status(201).json({
       success: true,
