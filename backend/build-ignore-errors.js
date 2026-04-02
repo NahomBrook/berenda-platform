@@ -1,10 +1,9 @@
-// backend/build-ignore-errors.js
 const { execSync } = require('child_process');
 
 console.log('🚀 Building backend for Vercel...');
 
 try {
-  // Generate Prisma client
+  // Generate Prisma client - THIS IS CRITICAL
   console.log('📦 Generating Prisma client...');
   execSync('npx prisma generate', { stdio: 'inherit' });
   
