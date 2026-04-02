@@ -1,16 +1,18 @@
+// backend/src/modules/auth/auth.service.ts
 import bcrypt from "bcrypt";
-import jwt, { SignOptions } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import prisma from "../../config/prisma";
 
 const JWT_SECRET = process.env.JWT_ACCESS_SECRET || "superlongrandomaccesssecret";
 const JWT_EXPIRES = process.env.JWT_ACCESS_EXPIRES || "15m";
 
-// Define the JWT payload type
-interface JWTPayload {
-  userId: string;
+// Define proper types for Google payload
+interface GoogleTokenPayload {
+  aud: string;
   email: string;
-  roles: string[];
-  isAdmin: boolean;
+  name: string;
+  picture?: string;
+  sub: string;
 }
 
 export const registerUser = async (
@@ -80,18 +82,15 @@ export const loginUser = async (email: string, password: string) => {
 
   const roleNames = user.roles.map(r => r.role.name);
   
-  const tokenPayload: JWTPayload = {
-    userId: user.id,
+  // Fixed JWT sign - use as any to bypass strict type checking
+  const payload = { 
+    userId: user.id, 
     email: user.email,
     roles: roleNames,
     isAdmin: roleNames.includes("ADMIN") || roleNames.includes("SUPER_ADMIN")
   };
   
-  const signOptions: SignOptions = {
-    expiresIn: JWT_EXPIRES as any
-  };
-  
-  const token = jwt.sign(tokenPayload, JWT_SECRET, signOptions);
+  const token = jwt.sign(payload as any, JWT_SECRET, { expiresIn: JWT_EXPIRES as any });
 
   return { user, token };
 };
@@ -103,15 +102,15 @@ export const loginWithGoogle = async (idToken: string) => {
     const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
     if (!response.ok) throw new Error("Invalid Google ID token");
     
-    const googlePayload: any = await response.json();
+    const payload = await response.json() as GoogleTokenPayload;
 
-    if (GOOGLE_CLIENT_ID && googlePayload.aud !== GOOGLE_CLIENT_ID) {
+    if (GOOGLE_CLIENT_ID && payload.aud !== GOOGLE_CLIENT_ID) {
       throw new Error("Google ID token audience mismatch");
     }
 
-    const email: string = googlePayload.email;
-    const fullName: string = googlePayload.name || "";
-    const picture: string | undefined = googlePayload.picture;
+    const email: string = payload.email;
+    const fullName: string = payload.name || "";
+    const picture: string | undefined = payload.picture;
 
     if (!email) throw new Error("Google token did not contain email");
 
@@ -171,18 +170,14 @@ export const loginWithGoogle = async (idToken: string) => {
     
     const roleNames = user.roles.map(r => r.role.name);
     
-    const tokenPayload: JWTPayload = {
-      userId: user.id,
+    const payload2 = { 
+      userId: user.id, 
       email: user.email,
       roles: roleNames,
       isAdmin: roleNames.includes("ADMIN") || roleNames.includes("SUPER_ADMIN")
     };
     
-    const signOptions: SignOptions = {
-      expiresIn: JWT_EXPIRES as any
-    };
-    
-    const token = jwt.sign(tokenPayload, JWT_SECRET, signOptions);
+    const token = jwt.sign(payload2 as any, JWT_SECRET, { expiresIn: JWT_EXPIRES as any });
     
     return { user, token };
   } catch (error: any) {

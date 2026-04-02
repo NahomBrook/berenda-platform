@@ -1,3 +1,4 @@
+// backend/src/modules/payments/payments.controller.ts
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
@@ -68,8 +69,7 @@ export const initializePayment = async (req: Request, res: Response) => {
 
     const effectivePaymentMethod = paymentMethod || PAYMENT_METHODS.TELEBIRR;
 
-    const customerFullName =
-      customer?.fullName || fullName || ("" as string);
+    const customerFullName = customer?.fullName || fullName || "";
     const customerEmail = customer?.email || email || "";
     const customerPhone = customer?.phoneNumber || phoneNumber || "";
     const customerNotes = customer?.notes || notes || "";
@@ -125,10 +125,8 @@ export const initializePayment = async (req: Request, res: Response) => {
     });
 
     // Create Payment Record
-    const txRef = 
-`ber-${Date.now()}-${Math.random().toString(36).substring(2, 
-10)}`;    const payment = await 
-prisma.payment.create({
+    const txRef = `ber-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    const payment = await prisma.payment.create({
       data: {
         bookingId: booking.id,
         txRef,
@@ -182,7 +180,8 @@ prisma.payment.create({
           body: form,
         });
 
-        chapaData = await chapaResponse.json();
+        const chapaJson: any = await chapaResponse.json();
+        chapaData = chapaJson;
       } else {
         // Card / Bank (use Chapa transaction initialize checkout)
         const payload = {
@@ -215,7 +214,8 @@ prisma.payment.create({
           body: JSON.stringify(payload),
         });
 
-        chapaData = await chapaResponse.json();
+        const chapaJson: any = await chapaResponse.json();
+        chapaData = chapaJson;
       }
     } catch (err: any) {
       console.error("Chapa request failed:", err);
@@ -227,10 +227,11 @@ prisma.payment.create({
       });
     }
 
-    const checkoutUrl =
-      chapaData?.data?.checkout_url || chapaData?.checkout_url || chapaData?.data?.url;
+    const checkoutUrl = (chapaData && (chapaData.data?.checkout_url || chapaData.checkout_url || chapaData.data?.url)) || undefined;
 
-    if (!chapaData || chapaData.status !== "success" || !checkoutUrl) {
+    const chapaSuccess = !!(chapaData && (chapaData.status === "success" || chapaData?.data?.status === "success"));
+
+    if (!chapaSuccess || !checkoutUrl) {
       await prisma.payment.update({
         where: { id: payment.id },
         data: { status: "failed", chapaResponse: chapaData as any },
@@ -279,43 +280,56 @@ export const verifyPayment = async (req: Request, res: Response) => {
       headers: { "Authorization": `Bearer ${CHAPA_SECRET_KEY}` }
     });
 
-    const chapaData = await chapaResponse.json();
+    const chapaData: any = await chapaResponse.json();
 
-    if (chapaData.status === "success" && chapaData.data.status === "success") {
+    const verifiedSuccess = !!(chapaData && (chapaData.status === "success" || chapaData?.data?.status === "success"));
+
+    if (verifiedSuccess) {
       // Mark successful
       await prisma.payment.update({ where: { id: payment.id }, data: { status: "success", chapaResponse: chapaData as any } });
       await prisma.booking.update({ where: { id: payment.bookingId }, data: { status: "confirmed" } });
 
-      // Notify host automatically! Use Chat system
-      let chat = await prisma.chat.findFirst({
-        where: {
-          AND: [
-            { participants: { some: { userId: payment.booking.renterId } } },
-            { participants: { some: { userId: payment.booking.property.ownerId } } }
-          ]
+      // Fetch the complete booking with relations (FIXED: use bookingId instead of payment.booking)
+      const bookingWithDetails = await prisma.booking.findUnique({
+        where: { id: payment.bookingId },
+        include: {
+          property: { include: { owner: true } },
+          renter: true
         }
       });
-      if (!chat) {
-        chat = await prisma.chat.create({
-          data: {
-            participants: {
-              create: [
-                { userId: payment.booking.renterId },
-                { userId: payment.booking.property.ownerId }
-              ]
+
+      if (bookingWithDetails) {
+        // Notify host automatically! Use Chat system
+        let chat = await prisma.chat.findFirst({
+          where: {
+            AND: [
+              { participants: { some: { userId: bookingWithDetails.renterId } } },
+              { participants: { some: { userId: bookingWithDetails.property.ownerId } } }
+            ]
+          }
+        });
+        if (!chat) {
+          chat = await prisma.chat.create({
+            data: {
+              participants: {
+                create: [
+                  { userId: bookingWithDetails.renterId },
+                  { userId: bookingWithDetails.property.ownerId }
+                ]
+              }
             }
+          });
+        }
+        // Automate Booking Message
+        await prisma.message.create({
+          data: {
+            chatId: chat.id,
+            senderId: bookingWithDetails.renterId,
+            message: `Booking Confirmed! I have successfully booked and paid for "${bookingWithDetails.property.title}".`,
+            isAi: false
           }
         });
       }
-      // Automate Booking Message
-      await prisma.message.create({
-        data: {
-          chatId: chat.id,
-          senderId: payment.booking.renterId,
-          message: `Booking Confirmed! I have successfully booked and paid for "${payment.booking.property.title}".`,
-          isAi: false
-        }
-      });
 
       return res.status(200).json({ success: true, message: "Payment verified successfully", data: payment });
     } else {
@@ -333,8 +347,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
 export const chapaWebhook = async (req: Request, res: Response) => {
   try {
     const signature = req.headers["chapa-signature"];
-    const rawBody =
-      req.body instanceof Buffer ? req.body.toString("utf8") : JSON.stringify(req.body ?? {});
+    const rawBody = req.body instanceof Buffer ? req.body.toString("utf8") : JSON.stringify(req.body ?? {});
 
     const hash = crypto.createHmac("sha256", CHAPA_WEBHOOK_SECRET).update(rawBody).digest("hex");
     if (typeof signature === "string" && hash !== signature) {

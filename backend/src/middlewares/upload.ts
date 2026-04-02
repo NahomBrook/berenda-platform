@@ -1,19 +1,7 @@
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import cloudinary from "../config/cloudinary";
-import fs from "fs";
 import path from "path";
-
-// Ensure uploads directory exists for local development
-const uploadsDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  try {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log("📁 Uploads directory created:", uploadsDir);
-  } catch (error) {
-    console.error("❌ Failed to create uploads directory:", error);
-  }
-}
 
 // Configure Cloudinary storage for production
 const cloudinaryStorage = new CloudinaryStorage({
@@ -27,19 +15,11 @@ const cloudinaryStorage = new CloudinaryStorage({
   },
 });
 
-// Local disk storage as fallback
-const diskStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
-  },
-});
+// In serverless env (Vercel) avoid disk writes. Use memory storage as fallback.
+const memoryStorage = multer.memoryStorage();
 
-// Use Cloudinary if configured, otherwise fallback to disk storage
-const storage = process.env.CLOUDINARY_CLOUD_NAME ? cloudinaryStorage : diskStorage;
+// Use Cloudinary if configured, otherwise fallback to memory storage
+const storage = process.env.CLOUDINARY_CLOUD_NAME ? cloudinaryStorage : memoryStorage;
 
 const upload = multer({
   storage,

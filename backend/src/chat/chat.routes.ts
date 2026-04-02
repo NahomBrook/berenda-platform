@@ -13,7 +13,7 @@ import {
 
 const router = Router();
 
-// Test endpoint to verify route is working (no auth required for test)
+// Test endpoint
 router.get("/test", (req, res) => {
   res.json({ message: "Chat routes are working!", timestamp: new Date().toISOString() });
 });

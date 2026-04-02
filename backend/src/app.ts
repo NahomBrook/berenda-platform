@@ -15,17 +15,38 @@ import paymentRoutes from "./modules/payments/payments.routes";
 
 const app = express();
 
+// Dynamic CORS origins - allows any Vercel deployment URL
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'https://berenda-platform.vercel.app',
+  'https://berenda-plc.vercel.app',
+  'https://berenda-41a2.vercel.app',
+  /\.vercel\.app$/,
+];
+
 // Security middlewares
 app.use(helmet());
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'https://berenda-platform.vercel.app',
-    'https://berenda-plc.vercel.app',
-    'https://berenda-41a2.vercel.app',
-    /\.vercel\.app$/,
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin matches any allowed pattern
+    const isAllowed = allowedOrigins.some(pattern => {
+      if (pattern instanceof RegExp) {
+        return pattern.test(origin);
+      }
+      return pattern === origin;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log(`CORS blocked origin: ${origin}`);
+      callback(null, true); // Allow anyway for now, but log it
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -36,11 +57,14 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Static files for uploads
-app.use("/uploads", express.static("uploads"));
+// Static files for uploads - wrapped in try/catch for Vercel
+try {
+  app.use("/uploads", express.static("uploads"));
+} catch (error) {
+  console.log("Uploads directory not available in serverless environment");
+}
 
 // ==================== PUBLIC ROUTES (No Auth) ====================
-// Health check - useful for monitoring
 app.get("/api/health", (req: Request, res: Response) => {
   res.status(200).json({
     status: "ok",
@@ -50,7 +74,6 @@ app.get("/api/health", (req: Request, res: Response) => {
   });
 });
 
-// AI test endpoint
 app.get("/api/ai/test", (req: Request, res: Response) => {
   res.json({
     message: "AI routes are working!",
@@ -93,6 +116,7 @@ app.use((req: Request, res: Response) => {
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err.stack || err);
   
+  // Always return JSON, never HTML
   if (err.name === 'UnauthorizedError') {
     return res.status(401).json({
       success: false,

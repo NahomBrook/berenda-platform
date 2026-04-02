@@ -4,7 +4,7 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Helper function to safely get string from query param (accept ParsedQs or unknown from Express)
+// Helper function to safely get string from query param
 const getStringParam = (param: any): string | undefined => {
   if (param === undefined || param === null) return undefined;
   if (Array.isArray(param)) return String(param[0]);
@@ -17,6 +17,13 @@ const getNumberParam = (param: any): number | undefined => {
   if (str === undefined) return undefined;
   const num = Number(str);
   return isNaN(num) ? undefined : num;
+};
+
+// Helper to safely get ID from params
+const getIdParam = (param: any): string | undefined => {
+  if (param === undefined || param === null) return undefined;
+  if (Array.isArray(param)) return String(param[0]);
+  return String(param);
 };
 
 // GET ALL (With Full Filters including checkIn/checkOut)
@@ -198,10 +205,14 @@ export const searchProperties = async (req: Request, res: Response) => {
   }
 };
 
-// GET BY ID
+// GET BY ID - FIXED: proper ID handling
 export const getPropertyById = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = getIdParam(req.params.id);
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Invalid property ID" });
+    }
+    
     const property = await prisma.property.findFirst({
       where: { id, deletedAt: null },
       include: { 
@@ -214,6 +225,7 @@ export const getPropertyById = async (req: Request, res: Response) => {
     if (!property) return res.status(404).json({ message: "Property not found" });
     res.status(200).json({ success: true, data: property });
   } catch (error: any) {
+    console.error("Error getting property by ID:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -234,7 +246,7 @@ export const createProperty = async (req: Request, res: Response) => {
       area
     } = req.body;
     
-    const ownerId = (req as any).user?.userId;
+    const ownerId = (req as any).user?.userId || (req as any).user?.id;
 
     if (!ownerId) {
       return res.status(401).json({ message: "Unauthorized: No owner ID found" });
@@ -267,8 +279,12 @@ export const createProperty = async (req: Request, res: Response) => {
 // UPDATE
 export const updateProperty = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const ownerId = (req as any).user?.userId;
+    const id = getIdParam(req.params.id);
+    const ownerId = (req as any).user?.userId || (req as any).user?.id;
+
+    if (!id || !ownerId) {
+      return res.status(400).json({ success: false, message: "Invalid ID" });
+    }
 
     const updateResult = await prisma.property.updateMany({
       where: { id, ownerId },
@@ -288,8 +304,12 @@ export const updateProperty = async (req: Request, res: Response) => {
 // DELETE (Soft Delete)
 export const deleteProperty = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const ownerId = (req as any).user?.userId;
+    const id = getIdParam(req.params.id);
+    const ownerId = (req as any).user?.userId || (req as any).user?.id;
+
+    if (!id || !ownerId) {
+      return res.status(400).json({ success: false, message: "Invalid ID" });
+    }
 
     const deleteResult = await prisma.property.updateMany({
       where: { id, ownerId },
@@ -309,12 +329,12 @@ export const deleteProperty = async (req: Request, res: Response) => {
 // GET PROPERTIES BY LOCATION
 export const getPropertiesByLocation = async (req: Request, res: Response) => {
   try {
-    const { location } = req.params;
+    const locationParam = getIdParam(req.params.location);
     
     const properties = await prisma.property.findMany({
       where: {
         location: {
-          contains: location,
+          contains: locationParam,
           mode: 'insensitive'
         },
         deletedAt: null,
@@ -338,8 +358,12 @@ export const getPropertiesByLocation = async (req: Request, res: Response) => {
 // UPLOAD IMAGES
 export const uploadPropertyImages = async (req: Request, res: Response) => {
   try {
-    const { propertyId } = req.params;
+    const propertyId = getIdParam(req.params.propertyId);
     const files = req.files as any[];
+
+    if (!propertyId) {
+      return res.status(400).json({ success: false, message: "Invalid property ID" });
+    }
 
     if (!files || files.length === 0) {
       return res.status(400).json({ success: false, message: "No image files provided" });
@@ -367,6 +391,7 @@ export const uploadPropertyImages = async (req: Request, res: Response) => {
       data: mediaEntries,
     });
   } catch (error: any) {
+    console.error("Error uploading images:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
